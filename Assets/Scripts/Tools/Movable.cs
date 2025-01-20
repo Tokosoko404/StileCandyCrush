@@ -7,7 +7,7 @@ public class Movable : MonoBehaviour
     private Vector3 to;
     private float howfar;
     [SerializeField]
-    private float speed = 1;
+    private float speed;
     private bool idle= true;
     public bool Idle 
     {
@@ -15,7 +15,7 @@ public class Movable : MonoBehaviour
     }
     public IEnumerator MoveToPosition(Vector3 targetPosition) 
     {
-        if (speed < 0)
+        if (speed <= 0)
             Debug.LogWarning("speed must be a positive number");
         from = transform.position;
         to = targetPosition;
@@ -34,6 +34,14 @@ public class Movable : MonoBehaviour
     }
     private float Easing(float t)
     {
+        /*float c1 = 1.70158f,
+            c2 = c1 * 1.525f;
+        return t < 0.5f
+            ? (Mathf.Pow(t*2,2)*((c2+1)*2*t-c2)) / 2
+            : (Mathf.Pow(t*2 -2,2)*((c2+1)*(t*2-2)+c2)+2)/2
+            ;*/
+
         return t * t;
+        //return t;
     }
 }

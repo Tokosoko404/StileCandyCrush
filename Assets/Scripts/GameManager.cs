@@ -31,10 +31,14 @@ public class GameManager : Singleton<GameManager>
 
     private IEnumerator SetUp()
     {
+        // loading screen 
         pool.PoolObjects(dimensions.x * dimensions.y * 2);
         grid.InitializeGrid(dimensions);
         yield return null;
-        grid.PopulatedGrid();
+        StartCoroutine(grid.PopulatedGrid());
+
+        //grid.PopulatedGrid();
+        // remove the loading screen
     }
     /*
     private IEnumerator Demo() 
