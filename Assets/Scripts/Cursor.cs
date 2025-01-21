@@ -22,6 +22,10 @@ public class Cursor : Singleton<Cursor>
         spriteRenderer.enabled = false;
         selected = new Matchable[2];
     }
+    private void Start()
+    {
+        grid = (MatchableGrid) MatchableGrid.Instance;
+    }
     public void SelectFirst(Matchable toSelect)
     {
        selected[0] = toSelect;
@@ -39,7 +43,7 @@ public class Cursor : Singleton<Cursor>
         if (!enabled || selected[0] == null || selected[1]== null || !selected[0].Idle || !selected[1].Idle || selected[0] == selected[1])
             return;
         if (SelectedAreAdjacent())
-            StartCoroutine(Grid.TrySwap(selected));
+            StartCoroutine(grid.TrySwap(selected));
 
         SelectFirst(null);
     }
