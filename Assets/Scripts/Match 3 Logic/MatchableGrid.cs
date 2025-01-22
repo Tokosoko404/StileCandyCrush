@@ -2,51 +2,69 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.InputSystem.LowLevel;
+using UnityEngine.SocialPlatforms.Impl;
 
 public class MatchableGrid : GridSystem<Matchable>
 {
     private MatchablePool pool;
-    [SerializeField]private Vector3 offscreenOffSet;
+    private ScoreManager score;
+    [SerializeField] private Vector3 offscreenOffSet;
     
-    private void Start()
+    private void Start() 
     {
         pool= (MatchablePool) MatchablePool.Instance;
+        score = ScoreManager.Instance;
     }
-    public IEnumerator PopulatedGrid(bool allowMatches = false) 
+   
+    public IEnumerator PopulatedGrid(bool allowMatches = false,bool initialPopulation = false) 
     {
+        List<Matchable> newMatchables = new List<Matchable>();
         Matchable newMatchable;
         Vector3 onscreenPosition;
 
         for (int y = 0; y != Dimensions.y; ++y)
             for (int x = 0; x != Dimensions.x; ++x) 
-            {
-                newMatchable = pool.GetRandomMatchable();
-                //newMatchable.transform.position = transform.position + new Vector3(x, y);
-                onscreenPosition = transform.position + new Vector3(x, y);
-                newMatchable.transform.position = onscreenPosition +offscreenOffSet;
-                newMatchable.gameObject.SetActive(true);
-                newMatchable.position = new Vector2Int(x, y);
-                PutItemAt(newMatchable,x,y);
-
-                int initialType = newMatchable.Type;
-
-                while (!allowMatches && IsPartOfMatch(newMatchable))
+                if(IsEmpty(x, y))
                 {
-                   
-                    if (pool.NextType(newMatchable) == initialType)
+                    newMatchable = pool.GetRandomMatchable();
+                    //newMatchable.transform.position = transform.position + new Vector3(x, y);
+                    
+                    newMatchable.transform.position = transform.position + new Vector3(x,y) + offscreenOffSet;
+                    newMatchable.gameObject.SetActive(true);
+                    newMatchable.position = new Vector2Int(x, y);
+                    PutItemAt(newMatchable,x,y);
+                    newMatchables.Add(newMatchable);
+
+                    int initialType = newMatchable.Type;
+
+                    while (!allowMatches && IsPartOfMatch(newMatchable))
                     {
-                        Debug.LogWarning("Failed to find a matchable that didn't match at (" +x+ "," +y+ ")");
-                        Debug.Break();
-                        break; 
+                   
+                        if (pool.NextType(newMatchable) == initialType)
+                        {
+                            Debug.LogWarning("Failed to find a matchable that didn't match at (" +x+ "," +y+ ")");
+                            Debug.Break();
+                            break; 
+                        }
                     }
+
+                    
+
+                    //yield return new WaitForSeconds(0.1f);
                 }
 
-                StartCoroutine(newMatchable.MoveToPosition(onscreenPosition));
-
+        for (int i = 0; i != newMatchables.Count; ++i)
+        {
+            onscreenPosition = transform.position + new Vector3(newMatchables[i].position.x, newMatchables[i].position.y);
+            if (i == newMatchables.Count - 1)
+                yield return StartCoroutine(newMatchables[i].MoveToPosition(onscreenPosition));
+            else
+                StartCoroutine(newMatchables[i].MoveToPosition(onscreenPosition));
+            if (initialPopulation)
                 yield return new WaitForSeconds(0.1f);
-            }
-        
-        //yield return null;
+
+        }
+
     }
     private bool IsPartOfMatch(Matchable toMatch)
     {
@@ -90,22 +108,52 @@ public class MatchableGrid : GridSystem<Matchable>
 
         if (matches[0] != null)
         {
-            print(matches[0]);
+            StartCoroutine(score.ResolveMatch(matches[0])); 
 
         }
         if (matches[1] != null)
         {
-            print(matches[1]);
+            StartCoroutine(score.ResolveMatch(matches[1]));
 
         }
-        if (matches[0]  == null && matches[1] == null) 
+        if (matches[0] == null && matches[1] == null)
         {
-            StartCoroutine(Swap(copies));
+            yield return StartCoroutine(Swap(copies));
+            if (ScanForMatches())
+                StartCoroutine(FillAndScanGrid());
+
         }
+        else
+        {
+            StartCoroutine(FillAndScanGrid());
+
+        }
+            
+    }
+    private IEnumerator FillAndScanGrid()
+    {
+        CollapseGrid();
+        yield return StartCoroutine(PopulatedGrid(true));
+        if (ScanForMatches())
+            StartCoroutine(FillAndScanGrid());
+
 
     }
+
+    private IEnumerator Swap(Matchable[] toBeSwapped) 
+    {
+        SwapItemsAt(toBeSwapped[0].position, toBeSwapped[1].position);
+        Vector2Int temp = toBeSwapped[0].position;
+        toBeSwapped[0].position = toBeSwapped[1].position;
+        toBeSwapped[1].position = temp;
+        Vector3[] worldPosition = new Vector3[2];
+        worldPosition[0] = toBeSwapped[0].transform.position;
+        worldPosition[1] = toBeSwapped[1].transform.position;
+                     StartCoroutine(toBeSwapped[0].MoveToPosition(worldPosition[1]));
+        yield return StartCoroutine(toBeSwapped[1].MoveToPosition(worldPosition[0]));
+    }
     private Match GetMatch(Matchable toMatch)
-    { 
+    {
         Match match = new Match(toMatch);
         Match horizontalMatch,
               verticalMatch;
@@ -119,11 +167,11 @@ public class MatchableGrid : GridSystem<Matchable>
         if (verticalMatch.Count > 1)
             match.Merge(verticalMatch);
 
-        
+
         if (match.Count == 1)
             return null;
         return match;
-    
+
     }
     private Match GetMatchesInDirection(Matchable toMatch, Vector2Int direction)
     {
@@ -142,20 +190,56 @@ public class MatchableGrid : GridSystem<Matchable>
             {
                 break;
             }
-            
+
         }
         return match;
     }
-    private IEnumerator Swap(Matchable[] toBeSwapped) 
+    private void CollapseGrid()
     {
-        SwapItemsAt(toBeSwapped[0].position, toBeSwapped[1].position);
-        Vector2Int temp = toBeSwapped[0].position;
-        toBeSwapped[0].position = toBeSwapped[1].position;
-        toBeSwapped[1].position = temp;
-        Vector3[] worldPosition = new Vector3[2];
-        worldPosition[0] = toBeSwapped[0].transform.position;
-        worldPosition[1] = toBeSwapped[1].transform.position;
-                     StartCoroutine(toBeSwapped[0].MoveToPosition(worldPosition[1]));
-        yield return StartCoroutine(toBeSwapped[1].MoveToPosition(worldPosition[0]));
+        
+        for (int x = 0; x != Dimensions.x; ++x)
+            for (int yEmpty = 0; yEmpty != Dimensions.y - 1; ++yEmpty)
+                if (IsEmpty(x, yEmpty))
+                    for (int yNotEmpty = yEmpty + 1; yNotEmpty != Dimensions.y; ++yNotEmpty)
+                        if (!IsEmpty(x, yNotEmpty)&& GetItemAt(x,yNotEmpty).Idle)
+                        {
+                            MoveMatchableToPosition(GetItemAt(x, yNotEmpty),x,yEmpty);
+                            break;
+                        }
+
+
+            
+    }
+    private void MoveMatchableToPosition(Matchable toMove, int x, int y)
+    {
+        //RemoveItemAt(toMove.position);
+        //PutItemAt(toMove, x, y);
+        MoveItemTo(toMove.position,new Vector2Int(x,y));
+        toMove.position = new Vector2Int(x, y);
+        StartCoroutine(toMove.MoveToPosition(transform.position + new Vector3(x,y)));
+    }
+    private bool ScanForMatches()
+    {
+        bool madeAMatch = false;
+        Matchable toMatch;
+        Match match;
+
+        for (int y = 0; y != Dimensions.y; ++y)
+            for (int x = 0; x != Dimensions.x; ++x)
+                if (IsEmpty(x, y))
+                { 
+                    toMatch = GetItemAt(x, y);
+                    if(!toMatch.Idle)
+                        continue;
+                    match = GetMatch(toMatch);
+                    if (match != null)
+                    {
+                        madeAMatch = true;
+                        StartCoroutine(score.ResolveMatch(match));
+                    }
+                        
+                }
+        return madeAMatch;
+    
     }
 }

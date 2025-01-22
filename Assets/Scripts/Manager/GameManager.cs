@@ -35,7 +35,7 @@ public class GameManager : Singleton<GameManager>
         pool.PoolObjects(dimensions.x * dimensions.y * 2);
         grid.InitializeGrid(dimensions);
         yield return null;
-        StartCoroutine(grid.PopulatedGrid());
+        StartCoroutine(grid.PopulatedGrid(false,true));
 
         //grid.PopulatedGrid();
         // remove the loading screen
